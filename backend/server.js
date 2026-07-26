@@ -1,4 +1,3 @@
-const path = require("path");
 require("dotenv").config();
 
 const express = require("express");
@@ -18,51 +17,62 @@ const appointmentRoutes = require("./routes/appointmentRoutes");
 const prescriptionRoutes = require("./routes/prescriptionRoutes");
 const billingRoutes = require("./routes/billingRoutes");
 
-// Check if .env is loaded
-console.log("JWT loaded:", Boolean(process.env.JWT_SECRET));
-
 const app = express();
 
-// Security Middleware
 app.use(helmet());
 
-// CORS
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
-    credentials: true,
-  })
-);
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.CLIENT_URL,
+].filter(Boolean);
 
-// Body Parser
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Postman, Render health checks, mobile apps, etc.
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    const isAllowedOrigin = allowedOrigins.includes(origin);
+
+    // Allows Vercel preview deployment domains
+    const isVercelDomain =
+      origin.startsWith("https://") &&
+      origin.endsWith(".vercel.app");
+
+    if (isAllowedOrigin || isVercelDomain) {
+      return callback(null, true);
+    }
+
+    console.error("Blocked by CORS:", origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// Cookie Parser
 app.use(cookieParser());
 
-// Logger
 if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
 }
 
-// Rate Limiter
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 50,
-  message: "Too many requests from this IP, please try again after 15 minutes",
+  message: {
+    success: false,
+    message: "Too many requests. Please try again after 15 minutes.",
+  },
 });
 
 app.use("/api/auth", authLimiter);
 
-// Health Route
-app.get("/api/health", (req, res) => {
-  res.json({
-    success: true,
-    message: "HMS API is running",
-    time: new Date(),
-  });
-});
 app.get("/", (req, res) => {
   res.json({
     success: true,
@@ -70,7 +80,14 @@ app.get("/", (req, res) => {
   });
 });
 
-// Routes
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    message: "HMS API is running",
+    time: new Date(),
+  });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/patients", patientRoutes);
 app.use("/api/doctors", doctorRoutes);
@@ -78,11 +95,9 @@ app.use("/api/appointments", appointmentRoutes);
 app.use("/api/prescriptions", prescriptionRoutes);
 app.use("/api/billing", billingRoutes);
 
-// Error Middleware
 app.use(notFound);
 app.use(errorHandler);
 
-// Start Server
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
@@ -91,13 +106,15 @@ const startServer = async () => {
 
     app.listen(PORT, () => {
       console.log(
-        `🚀 HMS Server running in ${
+        `HMS Server running in ${
           process.env.NODE_ENV || "development"
         } mode on port ${PORT}`
       );
+
+      console.log("Allowed frontend URL:", process.env.CLIENT_URL);
     });
   } catch (error) {
-    console.error("❌ Server startup failed:", error.message);
+    console.error("Server startup failed:", error.message);
     process.exit(1);
   }
 };
