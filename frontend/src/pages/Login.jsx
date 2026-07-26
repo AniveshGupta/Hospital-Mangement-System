@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { MdLocalHospital } from "react-icons/md";
 import { useAuth } from "../context/AuthContext";
 
@@ -83,6 +83,16 @@ const Login = () => {
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
+
+          <p className="text-sm text-center mt-6 text-brand-700">
+            New patient?{" "}
+            <Link
+              to="/register"
+              className="text-brand-600 font-semibold hover:underline"
+            >
+              Create an account
+            </Link>
+          </p>
         </form>
       </div>
     </div>
