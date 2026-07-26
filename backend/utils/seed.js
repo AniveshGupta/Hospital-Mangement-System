@@ -13,9 +13,9 @@ const seed = async () => {
   const admin = await User.create({
     name: 'System Admin',
     email: 'admin@hms.com',
-    password: 'Admin@123',
+    password: process.env.ADMIN_PASSWORD,
     role: 'admin',
-    phone: '9999999999',
+    phone: '6387562654',
   });
 
   const doctorUser = await User.create({
@@ -63,7 +63,7 @@ const seed = async () => {
   await patientUser.save();
 
   console.log('Seed data created:');
-  console.log('  Admin    -> admin@hms.com   / Adminanivesh@123');
+  console.log('  Admin account created successfully');
   console.log('  Doctor   -> doctor@hms.com  / Doctor@123');
   console.log('  Patient  -> patient@hms.com / Patient@123');
 
