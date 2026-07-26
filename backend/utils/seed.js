@@ -63,7 +63,7 @@ const seed = async () => {
   await patientUser.save();
 
   console.log('Seed data created:');
-  console.log('  Admin    -> admin@hms.com   / Admin@123');
+  console.log('  Admin    -> admin@hms.com   / Adminanivesh@123');
   console.log('  Doctor   -> doctor@hms.com  / Doctor@123');
   console.log('  Patient  -> patient@hms.com / Patient@123');
 
