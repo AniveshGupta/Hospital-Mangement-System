@@ -63,6 +63,12 @@ app.get("/api/health", (req, res) => {
     time: new Date(),
   });
 });
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Hospital Management System API is running",
+  });
+});
 
 // Routes
 app.use("/api/auth", authRoutes);
