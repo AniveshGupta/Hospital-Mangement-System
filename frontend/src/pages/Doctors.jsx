@@ -1,21 +1,35 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { MdLocalHospital, MdEventAvailable } from 'react-icons/md';
+import { MdLocalHospital, MdEventAvailable, MdAdd, MdClose } from 'react-icons/md';
 import Layout from '../components/Layout';
 import Loader from '../components/Loader';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
 
+const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+const emptyDoctorForm = {
+  name: '', email: '', password: '', phone: '',
+  specialization: '', department: '', experienceYears: 0, consultationFee: 0,
+  qualifications: '',
+  availability: [{ day: 'monday', startTime: '09:00', endTime: '13:00', slotDurationMinutes: 30 }],
+};
+
 const Doctors = () => {
   const { user } = useAuth();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [bookingDoctor, setBookingDoctor] = useState(null);
   const [date, setDate] = useState('');
   const [slots, setSlots] = useState([]);
   const [reason, setReason] = useState('');
   const [slotLoading, setSlotLoading] = useState(false);
   const [justBookedBill, setJustBookedBill] = useState(null);
+
+  const [showAddDoctor, setShowAddDoctor] = useState(false);
+  const [doctorForm, setDoctorForm] = useState(emptyDoctorForm);
+  const [savingDoctor, setSavingDoctor] = useState(false);
 
   const fetchDoctors = async () => {
     setLoading(true);
@@ -69,7 +83,7 @@ const Doctors = () => {
 
       toast.success('Appointment booked!');
       setBookingDoctor(null);
-      setJustBookedBill(data.data.bill); // open the "how do you want to pay" prompt
+      setJustBookedBill(data.data.bill);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Booking failed');
     }
@@ -117,10 +131,65 @@ const Doctors = () => {
     }
   };
 
+  const handleDoctorFormChange = (e) => {
+    const { name, value } = e.target;
+    setDoctorForm({ ...doctorForm, [name]: value });
+  };
+
+  const updateAvailabilityRow = (idx, field, value) => {
+    const rows = [...doctorForm.availability];
+    rows[idx][field] = field === 'slotDurationMinutes' ? Number(value) : value;
+    setDoctorForm({ ...doctorForm, availability: rows });
+  };
+
+  const addAvailabilityRow = () => {
+    setDoctorForm({
+      ...doctorForm,
+      availability: [...doctorForm.availability, { day: 'monday', startTime: '09:00', endTime: '13:00', slotDurationMinutes: 30 }],
+    });
+  };
+
+  const removeAvailabilityRow = (idx) => {
+    setDoctorForm({ ...doctorForm, availability: doctorForm.availability.filter((_, i) => i !== idx) });
+  };
+
+  const handleAddDoctor = async (e) => {
+    e.preventDefault();
+    setSavingDoctor(true);
+    try {
+      await api.post('/auth/create-doctor', {
+        ...doctorForm,
+        experienceYears: Number(doctorForm.experienceYears),
+        consultationFee: Number(doctorForm.consultationFee),
+        qualifications: doctorForm.qualifications
+          .split(',')
+          .map((q) => q.trim())
+          .filter(Boolean),
+      });
+      toast.success('Doctor added successfully');
+      setShowAddDoctor(false);
+      setDoctorForm(emptyDoctorForm);
+      fetchDoctors();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add doctor');
+    } finally {
+      setSavingDoctor(false);
+    }
+  };
+
   return (
     <Layout>
-      <h1 className="font-display text-2xl font-semibold text-brand-950 mb-1">Doctors</h1>
-      <p className="text-brand-700 text-sm mb-6">Browse specialists and check availability</p>
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-brand-950">Doctors</h1>
+          <p className="text-brand-700 text-sm">Browse specialists and check availability</p>
+        </div>
+        {user.role === 'admin' && (
+          <button onClick={() => setShowAddDoctor(true)} className="btn-primary flex items-center gap-2">
+            <MdAdd /> Add Doctor
+          </button>
+        )}
+      </div>
 
       {loading ? (
         <Loader />
@@ -149,6 +218,9 @@ const Doctors = () => {
               )}
             </div>
           ))}
+          {doctors.length === 0 && (
+            <p className="text-brand-500 col-span-full text-center py-10">No doctors found</p>
+          )}
         </div>
       )}
 
@@ -188,7 +260,6 @@ const Doctors = () => {
         </div>
       )}
 
-      {/* Post-booking payment choice */}
       {justBookedBill && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-20 p-4">
           <div className="card w-full max-w-sm p-6 text-center">
@@ -204,6 +275,83 @@ const Doctors = () => {
             <button onClick={() => setJustBookedBill(null)} className="btn-secondary w-full">
               Pay at Hospital Later
             </button>
+          </div>
+        </div>
+      )}
+
+      {showAddDoctor && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-20 p-4 overflow-y-auto">
+          <div className="card w-full max-w-2xl p-6 relative my-8">
+            <button onClick={() => setShowAddDoctor(false)} className="absolute top-4 right-4 text-brand-500 hover:text-brand-800">
+              <MdClose size={22} />
+            </button>
+            <h2 className="text-lg font-semibold mb-4">Add New Doctor</h2>
+            <form onSubmit={handleAddDoctor} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Full Name</label>
+                  <input className="input" name="name" value={doctorForm.name} onChange={handleDoctorFormChange} required />
+                </div>
+                <div>
+                  <label className="label">Phone</label>
+                  <input className="input" name="phone" value={doctorForm.phone} onChange={handleDoctorFormChange} required />
+                </div>
+                <div>
+                  <label className="label">Login Email</label>
+                  <input className="input" type="email" name="email" value={doctorForm.email} onChange={handleDoctorFormChange} required />
+                </div>
+                <div>
+                  <label className="label">Login Password</label>
+                  <input className="input" type="password" name="password" value={doctorForm.password} onChange={handleDoctorFormChange} required minLength={6} />
+                </div>
+                <div>
+                  <label className="label">Specialization</label>
+                  <input className="input" name="specialization" value={doctorForm.specialization} onChange={handleDoctorFormChange} required placeholder="e.g. Cardiology" />
+                </div>
+                <div>
+                  <label className="label">Department</label>
+                  <input className="input" name="department" value={doctorForm.department} onChange={handleDoctorFormChange} />
+                </div>
+                <div>
+                  <label className="label">Experience (years)</label>
+                  <input className="input" type="number" min={0} name="experienceYears" value={doctorForm.experienceYears} onChange={handleDoctorFormChange} />
+                </div>
+                <div>
+                  <label className="label">Consultation Fee (₹)</label>
+                  <input className="input" type="number" min={0} name="consultationFee" value={doctorForm.consultationFee} onChange={handleDoctorFormChange} />
+                </div>
+              </div>
+
+              <div>
+                <label className="label">Qualifications (comma-separated)</label>
+                <input className="input" name="qualifications" value={doctorForm.qualifications} onChange={handleDoctorFormChange} placeholder="MBBS, MD Cardiology" />
+              </div>
+
+              <div>
+                <label className="label">Weekly Availability</label>
+                <div className="space-y-2">
+                  {doctorForm.availability.map((row, i) => (
+                    <div key={i} className="grid grid-cols-5 gap-2 items-center">
+                      <select className="input" value={row.day} onChange={(e) => updateAvailabilityRow(i, 'day', e.target.value)}>
+                        {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <input className="input" type="time" value={row.startTime} onChange={(e) => updateAvailabilityRow(i, 'startTime', e.target.value)} />
+                      <input className="input" type="time" value={row.endTime} onChange={(e) => updateAvailabilityRow(i, 'endTime', e.target.value)} />
+                      <input className="input" type="number" min={10} step={5} value={row.slotDurationMinutes} onChange={(e) => updateAvailabilityRow(i, 'slotDurationMinutes', e.target.value)} placeholder="Slot mins" />
+                      <button type="button" onClick={() => removeAvailabilityRow(i)} className="text-red-600 text-xs font-medium">Remove</button>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addAvailabilityRow} className="text-brand-600 text-sm font-medium mt-2">+ Add another day</button>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setShowAddDoctor(false)} className="btn-secondary">Cancel</button>
+                <button type="submit" disabled={savingDoctor} className="btn-primary">
+                  {savingDoctor ? 'Adding...' : 'Add Doctor'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
