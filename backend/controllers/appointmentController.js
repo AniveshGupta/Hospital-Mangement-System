@@ -7,7 +7,17 @@ const Bill = require('../models/Bill');
 // @route   POST /api/appointments
 // @access  Private/Admin,Receptionist,Patient
 const createAppointment = asyncHandler(async (req, res) => {
-  const { patient, doctor, date, startTime, endTime, reason } = req.body;
+  const { doctor, date, startTime, endTime, reason } = req.body;
+
+  // If a patient is booking for themselves, always trust the server-side link
+  // (req.user.patientProfile) rather than whatever the client sent — this also
+  // protects against a stale/cached frontend session missing this field.
+  const patient = req.user.role === 'patient' ? req.user.patientProfile : req.body.patient;
+
+  if (!patient) {
+    res.status(400);
+    throw new Error('No patient profile is linked to this account. Please log out and log back in.');
+  }
 
   const doctorDoc = await Doctor.findById(doctor);
   if (!doctorDoc) {
@@ -76,9 +86,11 @@ const getAppointments = asyncHandler(async (req, res) => {
     if (req.query.to) filter.date.$lte = new Date(req.query.to);
   }
 
+  // A logged-in doctor only sees their own appointments unless they're an admin
   if (req.user.role === 'doctor') {
     filter.doctor = req.user.doctorProfile;
   }
+  // A logged-in patient only sees their own appointments
   if (req.user.role === 'patient') {
     filter.patient = req.user.patientProfile;
   }
